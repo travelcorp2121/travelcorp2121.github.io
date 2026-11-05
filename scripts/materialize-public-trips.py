@@ -57,15 +57,16 @@ def build(source,destination):
     source,destination=Path(source),Path(destination)
     if source.resolve()==destination.resolve() or source.resolve() in destination.resolve().parents:raise ValueError('Output must be outside source')
     shutil.copytree(source,destination,dirs_exist_ok=True)
-    count=0;assets=0;html_bytes=0
-    for file in sorted((source/'viajes').glob('*/index.html')):
+    count=0;assets=0;html_bytes=0;wallets=0
+    files=[*(source/'viajes').glob('*/index.html'),*(source/'documentos').glob('*/index.html'),*(source/'ejemplos').glob('*/index.html')]
+    for file in sorted(files):
         index=file.read_bytes();revision=hashlib.sha1(('blob '+str(len(index))+'\0').encode()+index).hexdigest()
         html=decode_document(index,file.parent)
-        publication=re.findall(r'<!-- travel2121-publication:([a-f0-9]{64}) -->',html)
+        publication=re.findall(r'<!-- travel2121-(?:publication|wallet):([a-f0-9]{64}) -->',html)
         if not re.match(r'<!doctype html>',html,re.I) or '</html>' not in html:raise ValueError('Incomplete public HTML')
         output=destination/file.relative_to(source);html,total=externalize_assets(html,output.parent)
-        html+='\n<!-- travel2121-rendered:'+revision+' -->\n';output.write_text(html,encoding='utf-8');(output.parent/'ready.json').write_text(json.dumps({'schema':1,'status':'ready','id':file.parent.name,'revision':revision,'contentHash':publication[-1] if publication else None}),encoding='utf-8');count+=1;assets+=total;html_bytes+=len(html.encode())
-    return {'documents':count,'assets':assets,'html_bytes':html_bytes}
+        html+='\n<!-- travel2121-rendered:'+revision+' -->\n';output.write_text(html,encoding='utf-8');(output.parent/'ready.json').write_text(json.dumps({'schema':1,'status':'ready','id':file.parent.name,'revision':revision,'contentHash':publication[-1] if publication else None}),encoding='utf-8');count+=1;assets+=total;html_bytes+=len(html.encode());wallets+=int(file.relative_to(source).parts[0]=='documentos')
+    return {'documents':count,'wallets':wallets,'assets':assets,'html_bytes':html_bytes}
 
 if __name__=='__main__':
     print(json.dumps(build(sys.argv[1],sys.argv[2])))
