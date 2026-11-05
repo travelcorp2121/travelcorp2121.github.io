@@ -64,7 +64,13 @@ def build(source,destination):
         html=decode_document(index,file.parent)
         publication=re.findall(r'<!-- travel2121-(?:publication|wallet):([a-f0-9]{64}) -->',html)
         if not re.match(r'<!doctype html>',html,re.I) or '</html>' not in html:raise ValueError('Incomplete public HTML')
-        output=destination/file.relative_to(source);html,total=externalize_assets(html,output.parent)
+        output=destination/file.relative_to(source)
+        # Encrypted viewers intentionally disallow network images in their CSP.
+        # Keep their small brand assets inline, including the fictional wallet.
+        if file.relative_to(source).parts[0]=='documentos' or "connect-src 'none'" in html:
+            total=0
+        else:
+            html,total=externalize_assets(html,output.parent)
         html+='\n<!-- travel2121-rendered:'+revision+' -->\n';output.write_text(html,encoding='utf-8');(output.parent/'ready.json').write_text(json.dumps({'schema':1,'status':'ready','id':file.parent.name,'revision':revision,'contentHash':publication[-1] if publication else None}),encoding='utf-8');count+=1;assets+=total;html_bytes+=len(html.encode());wallets+=int(file.relative_to(source).parts[0]=='documentos')
     return {'documents':count,'wallets':wallets,'assets':assets,'html_bytes':html_bytes}
 
